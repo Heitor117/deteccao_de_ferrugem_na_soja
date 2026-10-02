@@ -1,1 +1,1 @@
-# detec-o_de_ferrugem_na_soja
+Algoritmo de PDI para identificar a necrose na lavoura da soja.
