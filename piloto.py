@@ -148,7 +148,7 @@ def processar(caminho, saida, n_segmentos, compactness, lado_max, z_lesao=2.0, k
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pasta", default="images_base/detached_leaves")
+    ap.add_argument("--pasta", default="image_base/detached_leaves")
     ap.add_argument("--imagem", default=None)
     ap.add_argument("--n", type=int, default=6)
     ap.add_argument("--segmentos", type=int, default=4000)
