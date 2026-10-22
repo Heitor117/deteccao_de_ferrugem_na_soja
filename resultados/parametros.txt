@@ -1,0 +1,12 @@
+segmentos = 4000
+compactness = 10
+lado_max = 900
+metodo = regra
+k = 8
+hue_necrose = 80.0
+hue_clorose = 100.0
+l_necrose = 55.0
+t_local = 12.0
+faixas = 10,50
+dias_entre_capturas = 3.0
+lang = pt

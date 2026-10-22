@@ -1,0 +1,7 @@
+RESUMO ESTATISTICO
+
+Imagens: 68 | Folhas (foliolos): 18
+Severidade estimada: media 48.22% | mediana 43.47% | dp 36.09 | min 0.42% (010_1) | max 100.00% (008_2)
+As imagens de uma mesma folha NAO sao independentes (capturas no tempo).
+Alertas de queda >= 5 pontos entre capturas: 3 (ver tabelas/anomalias_temporais.csv)
+Valores sao estimativas do algoritmo; acuracia so com anotacao manual (--anotacoes).
