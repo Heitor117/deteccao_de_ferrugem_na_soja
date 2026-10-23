@@ -3,7 +3,8 @@ Converte os .json do Labelme em mascaras de classe (PNG).
 
 Valores na mascara:  0 = fundo | 1 = saudavel | 2 = clorose | 3 = necrose
 Regra: dentro da folha (pixel nao-branco), tudo que NAO foi anotado e saudavel;
-os poligonos 'clorose' e 'necrose' sobrescrevem.
+os poligonos 'clorose' e 'necrose' sobrescrevem. Poligonos maiores sao pintados antes dos menores
+(pode contornar a folha toda como necrose e marcar clorose por cima). Fora da folha = fundo.
 
 Uso:
     python labelme_para_mascaras.py --json dados/anotacoes --imagens images_base/detached_leaves --saida dados/mascaras
@@ -34,7 +35,12 @@ def converter(caminho_json, pasta_imagens, saida):
     mascara = np.zeros((h, w), np.uint8)
     mascara[folha] = 1  # saudavel por padrao
 
-    for forma in d["shapes"]:
+    # poligonos MAIORES primeiro, MENORES por cima: assim vale tanto uma necrose grande envolvendo
+    # manchas de clorose quanto uma necrose pequena dentro de uma clorose, em qualquer ordem de desenho
+    def area(f):
+        return cv2.contourArea(np.round(np.array(f["points"])).astype(np.float32)) if len(f["points"]) >= 3 else 0
+    formas = sorted(d["shapes"], key=area, reverse=True)
+    for forma in formas:
         rotulo = forma["label"].strip().lower()
         if rotulo not in CLASSES:
             print(f"  aviso: rotulo desconhecido '{rotulo}' em {nome_img} (ignorado)")
@@ -44,6 +50,7 @@ def converter(caminho_json, pasta_imagens, saida):
             continue
         cv2.fillPoly(mascara, [pts], CLASSES[rotulo])
 
+    mascara[~folha] = 0  # poligono que passa do contorno da folha nao conta no fundo
     os.makedirs(saida, exist_ok=True)
     base = os.path.splitext(nome_img)[0]
     cv2.imwrite(os.path.join(saida, base + ".png"), mascara)

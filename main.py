@@ -29,8 +29,11 @@ Saidas (pasta resultados/):
     imagens_processadas/*.png           original | SLIC | classificacao, por imagem
     cache/, parametros.txt
 
-Premissa: o numero da captura e o tempo (dias = (captura-1) * --dias). Se as capturas nao forem
-igualmente espacadas, ajuste a coluna 'dia' manualmente ou passe --dias.
+TEMPO: a data de cada captura vem do EXIF da foto (DateTimeOriginal, data em que a foto foi tirada).
+'dia' = dias desde a 1a sessao de fotos; 'captura' = numero da sessao (1, 2, 3...). O numero no nome do
+arquivo NAO e usado como tempo (nas folhas 010 e 011 ele esta fora da ordem cronologica). Duas fotos da
+mesma folha na mesma sessao viram uma media no tempo e entram em tabelas/repeticoes_mesma_sessao.csv.
+Se as imagens nao tiverem EXIF, usa o numero do arquivo com --dias entre capturas (com aviso).
 """
 import argparse
 import glob
@@ -57,13 +60,13 @@ COR_HEX = {"saudavel": "#00DC00", "clorose": "#FF6E00", "necrose": "#6E370A"}
 CINZA = "#D9D9D9"
 
 TXT = {
-    "pt": dict(necrose="Necrose", clorose="Clorose", saudavel="Saudável", folhas="Folíolos (números = nº da captura)",
-               sev="Severidade (%)", n="Número de imagens", cap="Captura", matiz="Ângulo de matiz no plano a*-b* (graus)",
+    "pt": dict(necrose="Necrose", clorose="Clorose", saudavel="Saudável", folhas="Folíolos (números = dias após a 1ª captura)",
+               sev="Severidade (%)", n="Número de imagens", cap="Captura", dias="Dias após a 1ª captura", dia="Dia", matiz="Ângulo de matiz no plano a*-b* (graus)",
                sp="Superpixels (ponderado pela área)", orig="Original", res="Resultado", pred="Severidade prevista (%)",
                anot="Severidade anotada (%)", real="Anotado", prev="Previsto", media="Média", folha="Folíolo",
                mediana="mediana", ordenadas="Imagens ordenadas por severidade"),
-    "en": dict(necrose="Necrosis", clorose="Chlorosis", saudavel="Healthy", folhas="Leaflets (numbers = capture no.)",
-               sev="Severity (%)", n="Number of images", cap="Capture", matiz="Hue angle in the a*-b* plane (degrees)",
+    "en": dict(necrose="Necrosis", clorose="Chlorosis", saudavel="Healthy", folhas="Leaflets (numbers = days after first capture)",
+               sev="Severity (%)", n="Number of images", cap="Capture", dias="Days after first capture", dia="Day", matiz="Hue angle in the a*-b* plane (degrees)",
                sp="Superpixels (area-weighted)", orig="Original", res="Result", pred="Predicted severity (%)",
                anot="Annotated severity (%)", real="Annotated", prev="Predicted", media="Mean", folha="Leaflet",
                mediana="median", ordenadas="Images sorted by severity"),
@@ -138,15 +141,60 @@ def achar_pasta(pasta):
     raise SystemExit("ERRO: nao achei a pasta das imagens. Use --pasta (ex.: image_base/detached_leaves).")
 
 
-def separar_nome(df, dias):
+def datas_exif(pasta, imagens):
+    """Data/hora em que a foto foi TIRADA (EXIF DateTimeOriginal, tag 36867). NaT se nao houver.
+    Obs.: a tag 306 (DateTime) e a data da ultima edicao (aqui, quando o fundo foi removido no GIMP)."""
+    from PIL import Image
+    out = {}
+    for b in imagens:
+        d = None
+        for ext in (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"):
+            f = os.path.join(pasta, b + ext)
+            if os.path.isfile(f):
+                try:
+                    d = Image.open(f).getexif().get_ifd(0x8769).get(36867)
+                except Exception:
+                    d = None
+                break
+        out[b] = pd.to_datetime(d, format="%Y:%m:%d %H:%M:%S", errors="coerce") if d else pd.NaT
+    return out
+
+
+def separar_nome(df, dias, pasta):
+    """folha = prefixo do nome; tempo = data EXIF da foto (fallback: numero do arquivo)."""
+    df = df.drop(columns=[c for c in ("folha", "n_arquivo", "captura", "dia", "data", "repeticao") if c in df.columns])
     m = df["imagem"].str.extract(r"^(.*?)_(\d+)$")
     df["folha"] = m[0]
-    df["captura"] = pd.to_numeric(m[1])
-    if df["captura"].isna().any():
-        raise SystemExit("ERRO: nome de imagem fora do padrao <folha>_<captura> (ex.: 006_3): "
-                         + ", ".join(df.loc[df["captura"].isna(), "imagem"].head(5)))
-    df["dia"] = (df["captura"] - 1) * dias
-    return df.sort_values(["folha", "captura"]).reset_index(drop=True)
+    df["n_arquivo"] = pd.to_numeric(m[1])
+    if df["n_arquivo"].isna().any():
+        raise SystemExit("ERRO: nome de imagem fora do padrao <folha>_<numero> (ex.: 006_3): "
+                         + ", ".join(df.loc[df["n_arquivo"].isna(), "imagem"].head(5)))
+    datas = datas_exif(pasta, df["imagem"]) if pasta else {}
+    df["data"] = df["imagem"].map(datas) if datas else pd.NaT
+    if datas and df["data"].notna().all():
+        dia = df["data"].dt.normalize()
+        df["dia"] = (dia - dia.min()).dt.days
+        sessao = {d: i + 1 for i, d in enumerate(sorted(df["dia"].unique()))}
+        df["captura"] = df["dia"].map(sessao)
+        fonte = "EXIF (data em que a foto foi tirada)"
+    else:
+        print("  AVISO: sem data EXIF em todas as imagens -> tempo pelo numero do arquivo (--dias entre capturas)")
+        df["captura"] = df["n_arquivo"]
+        df["dia"] = (df["captura"] - 1) * dias
+        fonte = f"numero do arquivo x {dias:g} dias"
+    df["repeticao"] = df.duplicated(["folha", "captura"], keep=False)
+    df["data"] = pd.to_datetime(df["data"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+    return df.sort_values(["folha", "dia", "imagem"]).reset_index(drop=True), fonte
+
+
+def por_sessao(df):
+    """Uma linha por folha e sessao (media das fotos repetidas na mesma sessao) - base da analise temporal."""
+    num = ["pct_saudavel", "pct_clorose", "pct_necrose", "severidade_%"]
+    g = df.groupby(["folha", "captura", "dia"])
+    out = g[num].mean().reset_index()
+    out["imagem"] = g["imagem"].agg("+".join).values
+    out["n_fotos"] = g.size().values
+    return out.sort_values(["folha", "dia"]).reset_index(drop=True)
 
 
 # --------------------------------------------------------------------------------------
@@ -159,11 +207,11 @@ def tabela_evolucao(df):
         t, y = g["dia"].to_numpy(float), g["severidade_%"].to_numpy(float)
         audpc = float(np.sum((y[1:] + y[:-1]) / 2 * np.diff(t))) if len(g) > 1 else np.nan
         dur = t[-1] - t[0] if len(g) > 1 else np.nan
-        acima = g.loc[g["severidade_%"] > 50, "captura"]
+        acima = g.loc[g["severidade_%"] > 50, "dia"]
         lin.append({"folha": f, "n_capturas": len(g), "sev_inicial": y[0], "sev_final": y[-1],
                     "delta": y[-1] - y[0], "sev_max": y.max(), "AUDPC": audpc,
                     "sAUDPC_%": audpc / dur if dur else np.nan,
-                    "1a_captura_acima_50%": int(acima.iloc[0]) if len(acima) else np.nan})
+                    "1o_dia_acima_50%": int(acima.iloc[0]) if len(acima) else np.nan})
     return pd.DataFrame(lin).round(2)
 
 
@@ -208,13 +256,13 @@ def _empilhar(ax, x, d, w=0.85):
 def fig_evolucao(df, t, destino):
     fig, ax = plt.subplots(figsize=(3.4, 2.8))
     for f, g in df.groupby("folha"):
-        ax.plot(g["captura"], g["severidade_%"], color="#555555", lw=0.8, alpha=0.55, marker="o", ms=2.5, zorder=3)
-    m = df.groupby("captura")["severidade_%"].mean()
+        ax.plot(g["dia"], g["severidade_%"], color="#555555", lw=0.8, alpha=0.55, marker="o", ms=2.5, zorder=3)
+    m = df.groupby("dia")["severidade_%"].mean()
     ax.plot(m.index, m.values, color=COR_HEX["necrose"], lw=2.2, marker="s", ms=4, zorder=4, label=t["media"])
     _cinza(ax)
     ax.set_ylim(0, 100)
-    ax.set_xticks(sorted(df["captura"].unique()))
-    ax.set_xlabel(t["cap"])
+    ax.set_xticks(sorted(df["dia"].unique()))
+    ax.set_xlabel(t["dias"])
     ax.set_ylabel(t["sev"])
     ax.legend(frameon=False, loc="upper left")
     fig.tight_layout()
@@ -226,21 +274,21 @@ def fig_paineis(df, t, destino, colunas=6):
     folhas = sorted(df["folha"].unique())
     lin = int(np.ceil(len(folhas) / colunas))
     fig, axs = plt.subplots(lin, colunas, figsize=(6.9, 1.15 * lin + 0.5), sharey=True, sharex=True, squeeze=False)
-    cmax = int(df["captura"].max())
+    dias_u = sorted(df["dia"].unique())
     for ax, f in zip(axs.ravel(), folhas):
         g = df[df["folha"] == f]
-        _empilhar(ax, g["captura"], g, 0.8)
+        _empilhar(ax, g["dia"], g, 2.2)
         _cinza(ax)
         ax.set_title(f, fontsize=7, pad=2)
         ax.set_ylim(0, 100)
-        ax.set_xlim(0.4, cmax + 0.6)
-        ax.set_xticks(range(1, cmax + 1))
+        ax.set_xlim(dias_u[0] - 2, dias_u[-1] + 2)
+        ax.set_xticks(dias_u)
         ax.tick_params(length=0, labelsize=6)
     for ax in axs.ravel()[len(folhas):]:
         ax.axis("off")
     for ax in axs[:, 0]:
         ax.set_ylabel("%")
-    fig.supxlabel(t["cap"], fontsize=8)
+    fig.supxlabel(t["dias"], fontsize=8)
     from matplotlib.patches import Patch
     fig.legend(handles=[Patch(color=COR_HEX["clorose"], label=t["clorose"]), Patch(color=COR_HEX["necrose"], label=t["necrose"])],
                loc="upper center", ncol=2, frameon=False)
@@ -261,8 +309,8 @@ def fig_barras_imagens(df, t, saida, pasta, destino, exemplo=None):
     e embaixo as barras empilhadas de todas as imagens, agrupadas por folha."""
     cache = os.path.join(saida, "cache")
     fx = _escolher_exemplo(df, exemplo)
-    ex = df[df["folha"] == fx].sort_values("captura")
-    tem_cache = all(os.path.isfile(os.path.join(cache, i + "_cls.png")) for i in ex["imagem"])
+    ex = df[df["folha"] == fx].sort_values(["dia", "imagem"])
+    tem_cache = bool(pasta) and all(os.path.isfile(os.path.join(cache, i + "_cls.png")) for i in ex["imagem"])
     fig = plt.figure(figsize=(6.9, 5.2 if tem_cache else 2.8))
     gs = fig.add_gridspec(4 if tem_cache else 1, max(len(ex), 1),
                           height_ratios=[0.6, 0.6, 0.3, 1.5] if tem_cache else [1], hspace=0.12, wspace=0.04)
@@ -291,7 +339,7 @@ def fig_barras_imagens(df, t, saida, pasta, destino, exemplo=None):
                 a.set_yticks([])
                 for s in a.spines.values():
                     s.set_visible(False)
-            a2.set_xlabel(f"{t['cap']} {int(r['captura'])} · {r['severidade_%']:.1f}%", fontsize=7, labelpad=2)
+            a2.set_xlabel(f"{t['dia']} {int(r['dia'])} · {r['severidade_%']:.1f}%", fontsize=7, labelpad=2)
             if j == 0:
                 a1.set_ylabel(t["orig"], fontsize=7)
                 a2.set_ylabel(t["res"], fontsize=7)
@@ -299,13 +347,13 @@ def fig_barras_imagens(df, t, saida, pasta, destino, exemplo=None):
     ax = fig.add_subplot(gs[-1, :])
     x, pos, centros, rot = 0.0, [], [], []
     for f, g in df.groupby("folha"):
-        g = g.sort_values("captura")
+        g = g.sort_values(["dia", "imagem"])
         p = x + np.arange(len(g))
         pos += list(p)
         centros.append((f, p.mean()))
-        rot += list(g["captura"])
+        rot += [int(v) for v in g["dia"]]
         x = p[-1] + 2
-    d = df.sort_values(["folha", "captura"])
+    d = df.sort_values(["folha", "dia", "imagem"])
     _empilhar(ax, np.array(pos), d, 0.9)
     _cinza(ax)
     ax.set_ylim(0, 100)
@@ -339,21 +387,22 @@ def fig_ordenado(df, t, destino):
 
 
 def fig_boxplot(df, t, destino):
-    caps = sorted(df["captura"].unique())
-    dados = [df.loc[df["captura"] == c, "severidade_%"] for c in caps]
+    caps = sorted(df["dia"].unique())
+    dados = [df.loc[df["dia"] == c, "severidade_%"] for c in caps]
     fig, ax = plt.subplots(figsize=(3.4, 2.8))
-    bp = ax.boxplot(dados, positions=caps, widths=0.55, patch_artist=True, showfliers=False, zorder=3,
+    bp = ax.boxplot(dados, positions=caps, widths=1.6, patch_artist=True, showfliers=False, zorder=3,
                     medianprops=dict(color="black"))
     for b in bp["boxes"]:
         b.set(facecolor="white", edgecolor="#555555")
     rng = np.random.default_rng(0)
     for c, v in zip(caps, dados):
-        ax.scatter(c + rng.uniform(-0.15, 0.15, len(v)), v, s=7, color=COR_HEX["necrose"], zorder=4)
+        ax.scatter(c + rng.uniform(-0.45, 0.45, len(v)), v, s=7, color=COR_HEX["necrose"], zorder=4)
     _cinza(ax)
     ax.set_ylim(0, 100)
     ax.set_xticks(caps)
-    ax.set_xticklabels([f"{c}\n(n={len(v)})" for c, v in zip(caps, dados)])
-    ax.set_xlabel(t["cap"])
+    ax.set_xticklabels([f"{c}\n(n={len(v)})" for c, v in zip(caps, dados)], fontsize=6)
+    ax.set_xlim(caps[0] - 2, caps[-1] + 2)
+    ax.set_xlabel(t["dias"])
     ax.set_ylabel(t["sev"])
     fig.tight_layout()
     fig.savefig(destino)
@@ -494,7 +543,10 @@ def main():
     if a.so_figuras:
         if not os.path.isfile(f_csv):
             raise SystemExit(f"ERRO: {f_csv} nao existe. Rode sem --so_figuras primeiro.")
-        pasta = achar_pasta(a.pasta) if os.path.isdir(os.path.join(d_cache)) and glob.glob(d_cache + "/*_cls.png") else ""
+        try:
+            pasta = achar_pasta(a.pasta)
+        except SystemExit:
+            pasta = ""
         df = pd.read_csv(f_csv, dtype={"imagem": str})
         print(f"[1/4] --so_figuras: {len(df)} imagens lidas de {f_csv}", flush=True)
     else:
@@ -518,15 +570,20 @@ def main():
                 print(f"  {i}/{len(arq)} {r['imagem']}  severidade={r['severidade_%']:.2f}%", flush=True)
         df = pd.DataFrame(linhas).round(2)
 
-    df = separar_nome(df, a.dias)
+    df, fonte_tempo = separar_nome(df, a.dias, pasta)
     df.round(2).to_csv(f_csv, index=False, encoding="utf-8-sig")
+    dt = por_sessao(df)  # analise temporal: uma linha por folha x sessao
 
     print("[2/4] Tabelas ...", flush=True)
-    evo = tabela_evolucao(df)
+    evo = tabela_evolucao(dt)
     evo.to_csv(os.path.join(d_tab, "evolucao_por_folha.csv"), index=False)
-    porcap = df.groupby("captura")["severidade_%"].agg(["count", "mean", "median", "std", "min", "max"]).round(2)
-    porcap.to_csv(os.path.join(d_tab, "severidade_por_captura.csv"), index_label="captura")
-    anom = tabela_anomalias(df, a.queda)
+    porcap = dt.groupby(["captura", "dia"])["severidade_%"].agg(["count", "mean", "median", "std", "min", "max"]).round(2)
+    porcap.to_csv(os.path.join(d_tab, "severidade_por_captura.csv"))
+    reps = df[df["repeticao"]][["folha", "captura", "dia", "imagem", "data", "severidade_%"]].copy()
+    if len(reps):
+        reps["amplitude_na_sessao"] = reps.groupby(["folha", "captura"])["severidade_%"].transform(lambda s: s.max() - s.min())
+    reps.round(2).to_csv(os.path.join(d_tab, "repeticoes_mesma_sessao.csv"), index=False)
+    anom = tabela_anomalias(dt, a.queda)
     anom.to_csv(os.path.join(d_tab, "anomalias_temporais.csv"), index=False)
     c1, c2 = (float(v) for v in a.faixas.split(","))
     sev = df["severidade_%"]
@@ -540,16 +597,18 @@ def main():
         f.write(f"Severidade estimada: media {sev.mean():.2f}% | mediana {sev.median():.2f}% | dp {sev.std():.2f} | "
                 f"min {sev.min():.2f}% ({df.loc[sev.idxmin(), 'imagem']}) | max {sev.max():.2f}% ({df.loc[sev.idxmax(), 'imagem']})\n")
         f.write("As imagens de uma mesma folha NAO sao independentes (capturas no tempo).\n")
+        f.write(f"Tempo: {fonte_tempo}. Dias das sessoes: {sorted(int(v) for v in df['dia'].unique())}\n")
+        f.write(f"Fotos repetidas na mesma sessao: {int(df['repeticao'].sum())} (ver tabelas/repeticoes_mesma_sessao.csv)\n")
         f.write(f"Alertas de queda >= {a.queda:g} pontos entre capturas: {len(anom)} (ver tabelas/anomalias_temporais.csv)\n")
         f.write("Valores sao estimativas do algoritmo; acuracia so com anotacao manual (--anotacoes).\n")
 
     print("[3/4] Figuras ...", flush=True)
     estilo()
-    fig_evolucao(df, t, os.path.join(d_fig, "fig_evolucao_folhas.png"))
-    fig_paineis(df, t, os.path.join(d_fig, "fig_evolucao_paineis.png"))
+    fig_evolucao(dt, t, os.path.join(d_fig, "fig_evolucao_folhas.png"))
+    fig_paineis(dt, t, os.path.join(d_fig, "fig_evolucao_paineis.png"))
     fig_barras_imagens(df, t, S, pasta, os.path.join(d_fig, "fig_barras_imagens.png"), a.exemplo)
     fig_ordenado(df, t, os.path.join(d_fig, "fig_ordenado.png"))
-    fig_boxplot(df, t, os.path.join(d_fig, "fig_boxplot_captura.png"))
+    fig_boxplot(dt, t, os.path.join(d_fig, "fig_boxplot_captura.png"))
     fig_hist_sev(df, t, os.path.join(d_fig, "fig_hist_severidade.png"))
     fig_hist_matiz(d_cache, t, cfg, os.path.join(d_fig, "fig_hist_matiz.png"))
 
@@ -560,7 +619,7 @@ def main():
         print(f"  (sem anotacoes em '{a.anotacoes}': F1/IoU/dispersao/confusao saem depois da anotacao)")
 
     with open(os.path.join(S, "parametros.txt"), "w", encoding="utf-8") as f:
-        for k, v in {**cfg, "faixas": a.faixas, "dias_entre_capturas": a.dias, "lang": a.lang}.items():
+        for k, v in {**cfg, "faixas": a.faixas, "tempo": fonte_tempo, "lang": a.lang}.items():
             f.write(f"{k} = {v}\n")
     print(f"\nPronto em {time.time() - t0:.0f}s -> {os.path.abspath(S)}")
     print(f"n = {len(df)} | folhas = {df['folha'].nunique()} | severidade media {sev.mean():.2f}% | mediana {sev.median():.2f}%")

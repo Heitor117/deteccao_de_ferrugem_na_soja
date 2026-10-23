@@ -44,13 +44,14 @@ COR_CLASSE = {
     "ignorar": (255, 255, 255),
 }
 
-# Limiares (ajustados olhando ~10 folhas; valide com a sua anotacao do Labelme)
+# Limiares calibrados contra a anotacao manual (Labelme): 14 folhas de treino, 8 de teste
+# (calibrar.py). Valores anteriores, ajustados a olho: HUE_NECROSE=80, HUE_CLOROSE=100, T_LOCAL=12
 LIMIAR_BRANCO = 235  # pixel com min(R,G,B) >= isso e fundo branco
-HUE_NECROSE = 80.0  # matiz Lab (graus) abaixo disso -> necrose (marrom)
-HUE_CLOROSE = 100.0  # matiz abaixo disso (e acima do anterior) -> clorose (amarelo)
+HUE_NECROSE = 70.0  # matiz Lab (graus) abaixo disso -> necrose (marrom)
+HUE_CLOROSE = 96.0  # matiz abaixo disso (e acima do anterior) -> clorose (amarelo)
 L_NECROSE = 55.0  # L* (escala OpenCV 0-255) abaixo disso -> tecido muito escuro = necrose
-T_LOCAL = 12.0  # queda de matiz (graus) em relacao aos vizinhos -> lesao pequena
-RAIO_LOCAL = 60  # raio (px) da vizinhanca para o contraste local
+T_LOCAL = 99.0  # contraste local DESLIGADO (a calibracao mostrou que piorava); antes 12
+RAIO_LOCAL = 60  # raio (px) da vizinhanca para o contraste local (sem efeito com T_LOCAL=99)
 
 
 # --------------------------------------------------------------------------------------

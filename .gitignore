@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+#Folders for images
+image_base/
+saida_piloto/
+resultados/
+anotacoes/mascaras

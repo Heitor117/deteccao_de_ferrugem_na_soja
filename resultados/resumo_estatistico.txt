@@ -1,7 +1,9 @@
 RESUMO ESTATISTICO
 
 Imagens: 68 | Folhas (foliolos): 18
-Severidade estimada: media 48.22% | mediana 43.47% | dp 36.09 | min 0.42% (010_1) | max 100.00% (008_2)
+Severidade estimada: media 39.83% | mediana 26.05% | dp 35.62 | min 0.04% (010_2) | max 100.00% (008_2)
 As imagens de uma mesma folha NAO sao independentes (capturas no tempo).
-Alertas de queda >= 5 pontos entre capturas: 3 (ver tabelas/anomalias_temporais.csv)
+Tempo: EXIF (data em que a foto foi tirada). Dias das sessoes: [0, 3, 6, 9, 14, 17]
+Fotos repetidas na mesma sessao: 4 (ver tabelas/repeticoes_mesma_sessao.csv)
+Alertas de queda >= 5 pontos entre capturas: 0 (ver tabelas/anomalias_temporais.csv)
 Valores sao estimativas do algoritmo; acuracia so com anotacao manual (--anotacoes).
