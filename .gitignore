@@ -217,8 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-#Folders for images
+# Pastas de imagens e saidas geradas pelo codigo (regeneraveis)
 image_base/
 saida_piloto/
+saida_todas/
+saida_main/
 resultados/
-anotacoes/mascaras
+anotacoes/mascaras/

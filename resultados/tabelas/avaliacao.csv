@@ -1,5 +1,0 @@
-classe,F1,IoU,MAE_pontos,r_Pearson,n_imagens
-saudavel,0.7359,0.5822,,,
-clorose,0.6322,0.4622,,,
-necrose,0.8035,0.6716,,,
-severidade,,,14.4163,0.8658,22.0
