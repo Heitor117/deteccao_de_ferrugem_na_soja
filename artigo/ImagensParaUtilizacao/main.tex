@@ -1,0 +1,608 @@
+% =====================================================================
+%  Artigo - Ferrugem asiatica da soja (formato do modelo do professor)
+%  Modelo: A4, Times, duas colunas, titulo e resumo em uma coluna,
+%  secoes "1 INTRODUCAO", subsecoes "2.1. Titulo" em italico,
+%  legenda de figura embaixo ("Figura N - ...") e titulo de tabela
+%  em cima ("Tabela N. ..."), referencias numeradas [1], [2]...
+%
+%  Linhas com % sao comentarios: nao aparecem no PDF.
+%  Os topicos de cada secao vem do "Roteiro do Artigo".
+% =====================================================================
+\documentclass[10pt,a4paper,twocolumn]{article}
+
+% --- Idioma e fonte ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazilian]{babel}
+\usepackage{newtxtext,newtxmath}   % Times, como no modelo
+
+% --- Pagina ---
+\usepackage[a4paper,top=2.2cm,bottom=2.2cm,left=2cm,right=2cm,columnsep=0.8cm]{geometry}
+\raggedbottom
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+% --- Pacotes ---
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usepackage[hidelinks]{hyperref}
+
+% --- Titulos de secao no estilo do modelo ---
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\normalsize\MakeUppercase}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\normalsize}{\thesubsection.}{0.4em}{\itshape}
+\titlespacing*{\section}{0pt}{10pt}{6pt}
+\titlespacing*{\subsection}{0pt}{8pt}{4pt}
+
+% --- Legendas: "Figura 1 – ..." embaixo; "Tabela 1. ..." em cima ---
+\usepackage{caption}
+\captionsetup{font=small}
+\captionsetup[figure]{labelsep=endash}
+\captionsetup[table]{labelsep=period,position=top}
+
+% --- Figura que compila mesmo antes de enviar a imagem ao Overleaf ---
+% Uso: \figura{largura}{arquivo}
+\newcommand{\figura}[2]{%
+  \IfFileExists{#2}{\includegraphics[width=#1]{#2}}{%
+    \fbox{\parbox[c][3cm][c]{\dimexpr #1-2\fboxsep-2\fboxrule\relax}{\centering\footnotesize
+      Enviar ao Overleaf:\\\texttt{\detokenize{#2}}}}}}
+
+% --- Nome da lista de referencias ---
+\addto\captionsbrazilian{\renewcommand{\refname}{REFERÊNCIAS}}
+
+\begin{document}
+
+% =====================================================================
+%  TITULO, AUTORES E RESUMO (uma coluna)
+% =====================================================================
+\twocolumn[{%
+\begin{center}
+{\Large Quantificação de clorose e necrose da ferrugem asiática da soja por segmentação em superpixels e atributos no espaço CIELab\par}
+\end{center}
+\vspace{6pt}
+Heitor Bartolomei Pauleto e \textit{Pedro Hiniralow Canato}\\
+\textit{Curso de Ciência da Computação, Universidade Paulista (UNIP), São José do Rio Preto -- SP, Brasil.}
+
+\vspace{10pt}
+RESUMO: A ferrugem asiática da soja, causada pelo fungo
+\textit{Phakopsora pachyrhizi}, provoca clorose e necrose nas folhas, e
+a proporção dessas regiões indica a severidade da doença. Este trabalho
+apresenta um método de processamento digital de imagens para estimar
+essa severidade a partir de imagens RGB, sem aprendizado profundo. Cada
+folíolo é dividido em superpixels pelo algoritmo SLIC, e cada superpixel
+é classificado como saudável, clorótico ou necrótico por regras sobre o
+matiz e a luminosidade no espaço CIELab. O método foi aplicado a 68
+imagens de 18 folíolos de um conjunto público, e os limiares foram
+calibrados contra anotação manual, com divisão entre treino e teste por
+folíolo. Nas 22 imagens anotadas, a severidade estimada teve correlação
+de 0,87 com a anotada, e o F1 foi de 0,82 para a necrose e 0,63 para a
+clorose, que se mostrou a principal fonte de erro. A comparação entre
+três algoritmos de superpixel e a classificação pixel a pixel, em CIELab
+e HSV, indicou impacto pequeno na precisão, e o Watershed compacto foi
+uma alternativa equivalente e mais rápida ao SLIC. A análise temporal
+confirmou o aumento da severidade ao longo dos dias e revelou
+inconsistências na nomenclatura das imagens do conjunto público.
+
+\vspace{4pt}
+Palavras-chave: ferrugem asiática da soja; superpixel; CIELab; clorose; necrose; processamento digital de imagens.
+
+\vspace{8pt}
+ABSTRACT: Asian soybean rust, caused by the fungus \textit{Phakopsora
+pachyrhizi}, produces chlorosis and necrosis on the leaves, and the
+proportion of these regions indicates disease severity. This work
+presents a digital image processing method to estimate this severity
+from RGB images, without deep learning. Each leaflet is divided into
+superpixels by the SLIC algorithm, and each superpixel is classified as
+healthy, chlorotic or necrotic by rules on hue and lightness in the
+CIELab color space. The method was applied to 68 images of 18 leaflets
+from a public dataset, and the thresholds were calibrated against manual
+annotation, with a leaflet-wise split between training and test sets. On
+the 22 annotated images, the estimated severity had a correlation of
+0.87 with the annotated one, and the F1-score was 0.82 for necrosis and
+0.63 for chlorosis, which proved to be the main source of error. A
+comparison of three superpixel algorithms and pixel-wise classification,
+in CIELab and HSV, showed little impact on accuracy, and the compact
+Watershed was an equivalent and faster alternative to SLIC. The temporal
+analysis confirmed the increase in severity over the days and revealed
+naming inconsistencies in the images of the public dataset.
+
+\vspace{4pt}
+Keywords: Asian soybean rust; superpixel; CIELab; chlorosis; necrosis; digital image processing.
+\vspace{14pt}
+}]
+
+% =====================================================================
+\section{Introdução}
+
+A soja tem grande importância na agricultura mundial, e o Brasil
+responde por cerca de um terço da produção global \cite{dasilva2022}.
+Entre as doenças que afetam a cultura está a ferrugem asiática, causada
+pelo fungo \textit{Phakopsora pachyrhizi}. A infecção provoca clorose
+(amarelecimento) e necrose (morte do tecido) nas folhas; a proporção das
+áreas afetadas é um indicador da severidade da doença.
+
+A avaliação visual da severidade pode ser demorada e subjetiva. Como
+alternativa, o processamento digital de imagens (PDI) permite analisar
+fotografias RGB de forma automática e reprodutível. Da Silva et al.
+\cite{dasilva2022} exploraram essa abordagem usando o espaço de cor
+CIELab e superpixels.
+
+Este trabalho implementa e amplia essa abordagem sem recorrer ao
+aprendizado profundo. Além da validação com anotações manuais, o estudo
+calibra os limiares em um conjunto de treino separado, compara três
+métodos de superpixel com a classificação pixel a pixel nos espaços
+CIELab e HSV, e acompanha a severidade de cada folíolo pelas datas reais
+das fotos. Essa análise temporal revelou divergências entre as datas das
+capturas e a sequência sugerida pelos nomes dos arquivos.
+
+O restante do artigo está organizado da seguinte forma: a seção 2 reúne
+os trabalhos relacionados, a seção 3 descreve o método, a seção 4
+apresenta os resultados e a seção 5 encerra com as conclusões.
+
+% =====================================================================
+\section{Trabalhos relacionados}
+% Um paragrafo (ou subsecao 2.1, 2.2...) por trabalho:
+% - da Silva et al. \cite{dasilva2022}: superpixel + intervalos CIELab;
+%   indices de necrose, clorose e ferrugem.
+% - Phan et al. \cite{phan2022}: SLIC + deep learning em milho; o
+%   superpixel como etapa previa.
+% - Khan e Narvekar \cite{khan2022}: balanceamento de cor + superpixel em
+%   tomate. Liga com o trabalho futuro.
+% - Feng et al. \cite{feng2024}: hiperespectral + deep learning, mais
+%   preciso porem caro. Contrasta com a proposta (RGB, sem treino).
+% - Lopes e Fernandes \cite{lopes2026}: CNN leve para lesoes de ferrugem.
+%   So temos o resumo: citar apenas o que esta nele.
+
+Da Silva et al. \cite{dasilva2022} segmentaram folíolos de soja em
+regiões saudáveis, cloróticas e necróticas a partir do espaço CIELab,
+utilizando superpixels como pós-processamento. O método gera índices de
+clorose, necrose e ferrugem e é a base deste trabalho.
+
+Phan et al. \cite{phan2022} dividiram folhas de milho em superpixels
+com o SLIC e classificaram cada região com redes convolucionais
+pré-treinadas, chegando a 97,77\% de acurácia em imagens de campo.
+
+Khan e Narvekar \cite{khan2022} combinaram balanceamento de cores e
+superpixels para detectar doenças em tomate em ambiente natural, com
+acurácia de cerca de 93\%. O balanceamento de cores é tratado aqui como
+trabalho futuro.
+
+Feng et al. \cite{feng2024} detectaram a ferrugem asiática da soja antes
+dos sintomas com imagens hiperespectrais e uma rede convolucional 3D,
+com acurácia próxima de 97\%, mas o método exige equipamento caro e
+treinamento profundo.
+
+Lopes e Fernandes \cite{lopes2026} propuseram o ASRDNet, uma rede leve
+para segmentar lesões de ferrugem em soja, com F1 de 0,9251 e menos
+parâmetros que U-Net, SegNet e DeepLabv3.
+
+Diferentemente desses trabalhos com aprendizado profundo, este artigo
+usa apenas imagens RGB e regras de cor, sem treinamento, e avalia o
+método contra anotação manual.
+
+% =====================================================================
+\section{Método}
+% Frase de abertura: o metodo classifica cada superpixel da folha como
+% saudavel, clorose ou necrose pela cor em CIELab, com limiares
+% calibrados contra anotacao manual. A Figura 1 resume as etapas.
+
+O método classifica cada superpixel da folha como saudável, clorose ou necrose pela cor no espaço CIELab, com limiares calibrados contra anotação manual. A Figura~\ref{fig:fluxo} resume as etapas, que são descritas nas subseções a seguir.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=3.5mm,
+  box/.style={draw,rounded corners=2pt,align=center,font=\footnotesize,
+              minimum width=0.8\columnwidth,inner sep=3pt},
+  every path/.style={->,>=stealth}]
+  \node[box] (a) {Imagem RGB do folíolo};
+  \node[box,below=of a] (b) {Redução ($\leq$ 900 px) e máscara da folha\\(limiar de branco, abertura e erosão)};
+  \node[box,below=of b] (c) {SLIC ($\approx$ 4.000 superpixels, compacidade 10)};
+  \node[box,below=of c] (d) {Média de $L^*a^*b^*$ por superpixel;\\matiz $h$ e $L^*$};
+  \node[box,below=of d] (e) {Regras: necrose se $h<75^\circ$ ou $L^*<55$;\\clorose se $h<96^\circ$; senão saudável};
+  \node[box,below=of e] (f) {Severidade (\%) = (clorose + necrose) / folha};
+  \draw (a)--(b); \draw (b)--(c); \draw (c)--(d); \draw (d)--(e); \draw (e)--(f);
+\end{tikzpicture}
+\caption{Fluxograma do método proposto.}
+\label{fig:fluxo}
+\end{figure}
+
+\subsection{Dados}
+
+Foram utilizadas 68 imagens de 18 folíolos de soja destacados,
+correspondentes ao Experimento 2 de da Silva et al. \cite{dasilva2022} e
+disponíveis no repositório público dos autores\footnote{\url{https://github.com/diego91964/paper_compag_106542}}.
+As imagens já são fornecidas com o fundo branco removido pelos autores.
+
+Cada folíolo foi fotografado em várias sessões ao longo da infecção, e
+os arquivos são nomeados no formato \textit{folíolo\_captura} (por
+exemplo, 016\_3 é a terceira captura do folíolo 016). As datas de cada
+foto foram lidas dos metadados EXIF, o que permitiu organizar as imagens
+em seis sessões, nos dias 0, 3, 6, 9, 14 e 17 após a primeira captura.
+Essa ordenação pelas datas reais é a base da análise temporal
+apresentada na seção 4.
+
+\subsection{Pré-processamento e superpixels}
+
+Para reduzir o tempo de processamento, cada imagem foi redimensionada
+para no máximo 900 pixels no maior lado. Em seguida, a máscara da folha
+foi obtida por um limiar de branco: um pixel é considerado parte da
+folha quando $\min(R,G,B) < 235$, o que separa o tecido vegetal do fundo
+branco. Pequenas falhas dessa máscara foram corrigidas com uma abertura
+($5\times5$) e um fechamento ($9\times9$). Em seguida, uma abertura com
+elemento estruturante elíptico de raio igual a 2,2\% do maior lado da
+imagem remove o pecíolo, que é estreito, e as bordas arredondadas da
+folha eliminadas por essa operação são recuperadas quando estão próximas
+do corpo da folha. Mantém-se apenas o maior componente conexo, e uma
+erosão com raio de 0,7\% do maior lado descarta a borda, onde há mistura
+com o fundo e sombra do recorte.
+
+A região da folha foi então dividida em superpixels pelo algoritmo SLIC
+\cite{achanta2012}, com cerca de 4.000 segmentos e compacidade 10. A
+segmentação foi aplicada apenas dentro da máscara, de modo que o fundo
+não gera superpixels. Cada superpixel agrupa pixels vizinhos de cor
+semelhante e passa a ser tratado como uma unidade na etapa de
+classificação. A implementação foi feita em Python, com as bibliotecas
+scikit-image \cite{skimage2014} e OpenCV \cite{opencv2000}, e o código
+está disponível publicamente\footnote{\url{https://github.com/Heitor117/deteccao_de_ferrugem_na_soja}}.
+
+\subsection{Classificação e severidade}
+
+Para cada superpixel, calculou-se a média dos componentes $L^*$, $a^*$ e
+$b^*$ dos seus pixels, com $a^*$ e $b^*$ centralizados em zero (o OpenCV
+os armazena com deslocamento de 128). A partir deles obteve-se o ângulo
+de matiz:
+\begin{equation}
+h = \operatorname{atan2}(b^*, a^*)
+\end{equation}
+que indica a cor do tecido: valores maiores correspondem ao verde da
+folha saudável, e valores menores, ao amarelo e ao marrom das lesões. A
+luminosidade $L^*$, na escala do OpenCV (0 a 255), complementa o matiz
+na identificação do tecido necrosado, que é mais escuro.
+
+Cada superpixel foi classificado pela seguinte regra:
+\begin{equation}
+\text{classe} =
+\begin{cases}
+\text{necrose}, & h < 75^\circ \text{ ou } L^* < 55\\
+\text{clorose}, & h < 96^\circ\\
+\text{saudável}, & \text{caso contrário}
+\end{cases}
+\end{equation}
+As condições são verificadas nessa ordem. Superpixels muito claros e
+pouco saturados ($L^* > 185$ e croma $C^* = \sqrt{a^{*2} + b^{*2}} < 14$),
+correspondentes a reflexos de luz, foram ignorados e não entram na área
+da folha. Os limiares foram calibrados contra
+anotação manual, como descrito na seção 3.4.
+
+Por fim, a severidade da folha foi calculada como a porcentagem da área
+afetada:
+\begin{equation}
+S = \frac{A_{\text{clorose}} + A_{\text{necrose}}}{A_{\text{folha}}}
+\times 100
+\end{equation}
+em que $A$ é a área, em pixels, de cada classe. A Figura~\ref{fig:exemplo}
+mostra o resultado em um folíolo do conjunto de teste.
+
+\begin{figure}[H]
+\centering
+\figura{\columnwidth}{ImagensParaUtilizacao/img/016_3.png}
+\caption{Folíolo 016 na captura 3: imagem original (esquerda), divisão em
+3.969 superpixels pelo SLIC (centro) e classificação em saudável (verde),
+clorose (laranja) e necrose (marrom escuro), com severidade de 11,93\%
+(direita).}
+\label{fig:exemplo}
+\end{figure}
+
+\subsection{Anotação e calibração}
+
+Para avaliar o método, 22 imagens foram anotadas manualmente na
+ferramenta Labelme \cite{labelme}, com polígonos delimitando as regiões
+de clorose e de necrose. O restante da folha foi considerado saudável.
+Foram anotadas apenas as lesões visíveis, e pontos muito pequenos foram
+ignorados.
+
+As imagens anotadas foram divididas por folíolo, para que capturas da
+mesma folha não ficassem ao mesmo tempo no treino e no teste. O conjunto
+de teste reuniu os folíolos 001, 012 e 016 (8 imagens), e as 14 imagens
+restantes formaram o conjunto de treino.
+
+Os limiares iniciais foram ajustados visualmente: $100^\circ$ para o
+matiz da clorose, $80^\circ$ para o matiz da necrose e 55 para a
+luminosidade da necrose, com uma regra adicional de contraste local:
+um superpixel cujo matiz ficasse mais de $12^\circ$ abaixo da mediana dos
+vizinhos, num raio de 60 pixels, era tratado como lesão. Esses valores
+foram então calibrados por busca em grade no conjunto de treino,
+resultando em $96^\circ$, $75^\circ$ e 55. A regra de contraste local
+foi descartada, pois piorava o resultado. Os limiares
+calibrados foram aplicados, sem novos ajustes, ao conjunto de teste.
+
+\subsection{Métricas e análise temporal}
+
+A classificação foi comparada à anotação manual pixel a pixel. Para cada
+classe (saudável, clorose e necrose), foram calculados o F1 e o IoU
+(\textit{Intersection over Union}):
+\begin{equation}
+F1 = \frac{2\,VP}{2\,VP + FP + FN}, \qquad
+IoU = \frac{VP}{VP + FP + FN}
+\end{equation}
+em que $VP$, $FP$ e $FN$ são os pixels verdadeiros positivos, falsos
+positivos e falsos negativos da classe. A severidade estimada foi
+comparada à anotada pelo erro absoluto médio, em pontos percentuais
+(p.p.), e pelo coeficiente de correlação de Pearson ($r$).
+
+Na análise temporal, a severidade de cada folíolo foi acompanhada ao
+longo dos dias de captura. A progressão da doença foi resumida pela
+AUDPC (área sob a curva de progresso da doença) \cite{shaner1977},
+calculada pela regra do trapézio:
+\begin{equation}
+\text{AUDPC} = \sum_{i=1}^{n-1} \frac{S_i + S_{i+1}}{2}\,(t_{i+1} - t_i)
+\end{equation}
+em que $S_i$ é a severidade na sessão $i$ e $t_i$ é o dia
+correspondente. Como o número de sessões varia entre os folíolos, a
+AUDPC também foi dividida pela duração do acompanhamento
+($t_n - t_1$), resultando na AUDPC padronizada (sAUDPC), que equivale à
+severidade média no período. Quando o mesmo folíolo foi fotografado
+duas vezes na mesma sessão, usou-se a média das duas fotos.
+
+\subsection{Comparação de segmentações}
+
+Para avaliar o papel do superpixel e do espaço de cor, foram comparadas
+quatro formas de segmentar a folha: SLIC \cite{achanta2012},
+Felzenszwalb \cite{felzenszwalb2004}, Watershed compacto
+\cite{neubert2014} e a classificação pixel a pixel, sem superpixel. Os
+três algoritmos foram configurados para gerar cerca de 4.000 regiões por
+folha: o Felzenszwalb com escala 10, $\sigma = 0{,}5$ e tamanho mínimo de
+20 pixels, e o Watershed compacto sobre o gradiente de Sobel da imagem em
+tons de cinza, com 4.000 marcadores e compacidade 0,001. Cada forma de
+segmentação foi testada em CIELab e em HSV, totalizando oito
+configurações. No HSV, a mesma regra usa o canal H como matiz e o canal
+V como brilho, e a saturação S substitui o croma na exclusão de
+reflexos. Para cada configuração, os três limiares foram recalibrados
+por busca em grade no conjunto de treino, escolhendo a combinação de
+maior F1 médio, e então avaliados no conjunto de teste. A Figura~\ref{fig:segmentacoes} mostra as
+fronteiras obtidas por cada método.
+
+\begin{figure}[H]
+\centering
+\figura{\columnwidth}{ImagensParaUtilizacao/comparacao/fig_segmentacoes.png}
+\caption{Fronteiras obtidas pelos métodos de segmentação comparados.}
+\label{fig:segmentacoes}
+\end{figure}
+
+% =====================================================================
+\section{Testes e resultados}
+% Abertura: o metodo acompanha bem a anotacao (r = 0,87) e detecta bem a
+% necrose; a clorose e o ponto fraco, e a escolha do superpixel quase
+% nao muda a precisao.
+
+O método acompanha bem a anotação manual, com correlação de Pearson $r = 0{,}87$ entre a severidade anotada e a estimada nas 22 imagens anotadas, e detecta bem a necrose. A clorose é o ponto fraco, e a escolha do algoritmo de superpixel quase não altera a precisão. As subseções a seguir detalham a calibração, a concordância com a anotação, a evolução da doença no tempo e a comparação entre segmentações.
+
+\subsection{Calibração}
+% A calibracao generaliza: no teste, F1 medio 0,64 -> 0,68 e erro
+% 20,1 -> 17,9 pontos (Tabela 1).
+
+A calibração melhorou o desempenho no treino e manteve o ganho nas imagens de teste (Tabela~\ref{tab:calibracao}). No treino, o F1 médio passou de 0,70 para 0,73 e o erro da severidade caiu de 17,1 para 12,4 pontos percentuais. No teste, o F1 médio passou de 0,65 para 0,69 e o erro caiu de 20,1 para 17,9 pontos. No teste, o ganho aparece nas três classes: o F1 foi de 0,75 para 0,79 no tecido saudável, de 0,53 para 0,54 na clorose e de 0,67 para 0,73 na necrose, que foi a classe mais beneficiada.
+
+\begin{table}[H]
+\centering
+\caption{Limiares padrão (100°/80°/55, com contraste local) e calibrados (96°/75°/55) no treino (14 imagens) e no teste (8 imagens).}
+\label{tab:calibracao}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{llccccc}
+\toprule
+ & & \multicolumn{4}{c}{F1} & Erro \\
+\cmidrule(lr){3-6}
+Conjunto & Limiares & Saud. & Clor. & Necr. & Média & (p.p.) \\
+\midrule
+Treino & Padrão    & 0,63 & 0,66 & 0,81 & 0,70 & 17,1 \\
+Treino & Calibrado & 0,68 & 0,67 & 0,84 & 0,73 & 12,4 \\
+\midrule
+Teste  & Padrão    & 0,75 & 0,53 & 0,67 & 0,65 & 20,1 \\
+Teste  & Calibrado & 0,79 & 0,54 & 0,73 & 0,69 & 17,9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Concordância com a anotação}
+% Nas 22 anotadas (inclui o treino, entao e otimista): F1 saudavel 0,74,
+% clorose 0,63, necrose 0,82; erro 14,4 pontos; r = 0,87.
+% Principal erro: saudavel virando clorose (pegar o % da matriz).
+% Maioria dos pontos acima da diagonal: tendencia a superestimar,
+% sobretudo em folhas intermediarias com amarelado difuso.
+
+Nas 22 imagens anotadas, o F1 foi de 0,74 para o tecido saudável, 0,63 para a clorose e 0,82 para a necrose, com erro médio de 14,4 pontos percentuais e $r = 0{,}87$ (Tabela~\ref{tab:avaliacao}). Como esse conjunto inclui as imagens de treino, os valores são otimistas e devem ser lidos junto com os resultados do conjunto de teste.
+
+A necrose é a classe mais bem detectada, e a clorose é a mais difícil. A matriz de confusão (Figura~\ref{fig:matriz}), normalizada pela classe anotada, mostra que o principal erro é tecido saudável classificado como clorose, que atinge 28\% dos pixels saudáveis. Também há confusão entre as classes de lesão: 22\% dos pixels de clorose foram classificados como saudáveis, e 15\% dos pixels de necrose, como clorose. O primeiro erro se reflete na severidade: na Figura~\ref{fig:dispersao}, a maioria dos pontos fica acima da diagonal, ou seja, o método tende a superestimar a severidade, sobretudo em folhas intermediárias com amarelado difuso, em que a fronteira entre verde e amarelo é pouco nítida.
+
+\begin{table}[H]
+\centering
+\caption{Desempenho por classe nas 22 imagens anotadas.}
+\label{tab:avaliacao}
+\small
+\begin{tabular}{lcc}
+\toprule
+Classe & F1 & IoU \\
+\midrule
+Saudável & 0,74 & 0,58 \\
+Clorose  & 0,63 & 0,46 \\
+Necrose  & 0,82 & 0,69 \\
+\midrule
+\multicolumn{3}{l}{Erro da severidade: 14,4 p.p.; $r$ = 0,87} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\figura{0.85\columnwidth}{ImagensParaUtilizacao/figuras/fig_dispersao_anotado.png}
+\caption{Severidade anotada versus severidade estimada.}
+\label{fig:dispersao}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\figura{0.85\columnwidth}{ImagensParaUtilizacao/figuras/fig_matriz_confusao.png}
+\caption{Matriz de confusão por pixel nas 22 imagens anotadas, normalizada pela classe anotada (cada linha soma 100\%).}
+\label{fig:matriz}
+\end{figure}
+
+\begin{table*}[t]
+\centering
+\caption{Comparação das segmentações e espaços de cor no conjunto de teste (calibrados no treino).}
+\label{tab:comparacao}
+\small
+\begin{tabular}{llrcccccc}
+\toprule
+Segmentação & Cor & Segmentos & Tempo de segm. (s) & F1 clorose & F1 necrose & F1 médio & Erro (p.p.) \\
+\midrule
+Watershed compacto & CIELab & 4.050   & 0,34  & 0,546 & 0,730 & 0,688 & 18,2 \\
+SLIC               & CIELab & 3.946   & 20,54 & 0,540 & 0,731 & 0,685 & 17,9 \\
+Felzenszwalb       & CIELab & 4.082   & 1,96  & 0,540 & 0,726 & 0,684 & 18,1 \\
+Sem superpixel     & CIELab & 288.902 & 0,43  & 0,534 & 0,716 & 0,678 & 17,2 \\
+Watershed compacto & HSV    & 4.050   & 0,34  & 0,540 & 0,717 & 0,678 & 18,7 \\
+Felzenszwalb       & HSV    & 4.082   & 1,96  & 0,536 & 0,718 & 0,677 & 18,5 \\
+SLIC               & HSV    & 3.946   & 20,54 & 0,537 & 0,717 & 0,677 & 18,2 \\
+Sem superpixel     & HSV    & 288.902 & 0,43  & 0,532 & 0,713 & 0,674 & 17,5 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Evolução no tempo}
+% 68 imagens: severidade media 39,8%, mediana 26,1%, de 0,04% (010_2)
+% a 100% (008_2). Os 18 foliolos tem severidade crescente com os dias.
+% Foliolos 010 e 011: numero do arquivo nao segue a ordem cronologica
+% (confirmado pelo EXIF); corrigido, a queda aparente some.
+% Fotos do mesmo dia: 002_3 x 002_4 = 17,4 pontos; 004_3 x 004_4 = 2,8.
+
+Nas 68 imagens, a severidade estimada tem média de 39,8\% e mediana de 26,1\%, variando de 0,04\% (imagem 010\_2) a 100\% (imagem 008\_2). Por sessão, a severidade média subiu de 17,3\% no dia 0 para 83,4\% no dia 17 (Tabela~\ref{tab:sessoes}), embora o número de folíolos fotografados diminua nas últimas sessões. Dos 16 folíolos fotografados em mais de uma sessão, 15 tiveram aumento de severidade (Figura~\ref{fig:barras}). A exceção foi o folíolo 010, que permaneceu praticamente sem sintomas, com severidade máxima de 2,45\%. Os folíolos 013 e 018 têm uma única captura e não permitem avaliar a evolução.
+
+\begin{table}[H]
+\centering
+\caption{Severidade estimada por sessão de fotos (uma linha por folíolo e sessão).}
+\label{tab:sessoes}
+\small
+\begin{tabular}{cccc}
+\toprule
+Dia & Folíolos & Média (\%) & Mediana (\%) \\
+\midrule
+0  & 17 & 17,3 & 4,7  \\
+3  & 16 & 27,6 & 15,1 \\
+6  & 14 & 40,3 & 32,1 \\
+9  & 12 & 63,1 & 71,4 \\
+14 & 4  & 67,6 & 70,1 \\
+17 & 3  & 83,4 & 89,5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Como os folíolos foram acompanhados por períodos diferentes, de 2 a 6 sessões, a progressão foi comparada pela sAUDPC. Ela variou de 1,0\% no folíolo 010 a 97,4\% no folíolo 008, que já estava muito afetado na primeira captura. Entre os três folíolos acompanhados durante os 17 dias (006, 016 e 017), a AUDPC foi de 824,6, 460,9 e 305,1, respectivamente, o que mostra ritmos de progressão bem diferentes mesmo com o mesmo período de observação.
+
+A ordenação pelas datas do EXIF revelou uma inconsistência no conjunto público: nos folíolos 010 e 011, o número no nome do arquivo não segue a ordem cronológica das fotos. Com as capturas reordenadas pela data real, a queda de severidade que aparecia nesses folíolos desaparece.
+
+A severidade também varia entre fotos do mesmo dia. Entre as capturas 002\_3 e 002\_4 a diferença foi de 17,4 pontos percentuais, e entre 004\_3 e 004\_4 foi de 2,8. Isso sugere que a posição e a iluminação da folha em cada foto influenciam o resultado, além da evolução da doença.
+
+\begin{figure}[H]
+\centering
+\figura{\columnwidth}{ImagensParaUtilizacao/figuras/fig_barras_imagens.png}
+\caption{Evolução da severidade de um folíolo e severidade de todas as imagens.}
+\label{fig:barras}
+\end{figure}
+
+\subsection{Comparação de segmentações e espaços de cor}
+% CIELab melhor que HSV nas 4 segmentacoes (0,006 a 0,010 no F1).
+% Superpixel reduz ~290 mil pixels a ~4 mil regioes e limpa o mapa,
+% sem aumentar a precisao. Gargalo: clorose (F1 0,53 a 0,55 em todas).
+% Diferencas de 0,01 com 8 imagens nao permitem dizer que um e melhor.
+% Watershed compacto: equivalente e ~60x mais rapido que o SLIC.
+% Tempos medidos com processos em paralelo: so para comparar.
+
+A Tabela~\ref{tab:comparacao} e a Figura~\ref{fig:comparacao} comparam as oito configurações no conjunto de teste. O CIELab superou o HSV nas quatro segmentações, mas por pouco: a diferença no F1 médio foi de 0,004 a 0,010. A vantagem é pequena, porém consistente.
+
+O superpixel reduz cerca de 290 mil pixels por folha a cerca de 4 mil regiões e limpa o mapa de classificação, mas não aumenta a precisão: em CIELab, o F1 médio ficou em 0,678 sem superpixel e entre 0,684 e 0,688 com ele, e o erro da severidade foi até menor sem superpixel (17,2 contra 17,9 a 18,2 pontos). O gargalo está na clorose, cujo F1 ficou entre 0,53 e 0,55 em todas as configurações, qualquer que seja a segmentação ou o espaço de cor.
+
+Com apenas 8 imagens de teste, diferenças de 0,01 no F1 não permitem afirmar que um algoritmo é melhor que outro. Por isso o método principal continua sendo SLIC com CIELab, e o Watershed compacto entra como alternativa de desempenho equivalente e cerca de 60 vezes mais rápida na segmentação (0,34~s contra 20,54~s por folha). Os tempos medem apenas a etapa de segmentação, foram obtidos com vários processos em paralelo e servem somente para comparar os métodos, não como tempo absoluto. Na recalibração de cada configuração, a busca escolheu em todas as segmentações em CIELab os mesmos limiares do método principal ($96^\circ$, $75^\circ$ e 55), e $52^\circ$ e $36^\circ$ para os matizes no HSV.
+
+\begin{figure}[H]
+\centering
+\figura{\columnwidth}{ImagensParaUtilizacao/comparacao/fig_comparacao.png}
+\caption{Desempenho das oito configurações comparadas.}
+\label{fig:comparacao}
+\end{figure}
+
+% --- Itens opcionais (use se sobrar espaco) ---
+% figuras/fig_ordenado.png        - imagens ordenadas por severidade
+% figuras/fig_evolucao_folhas.png - curvas de evolucao por foliolo
+% figuras/fig_hist_matiz.png      - histograma do matiz com limiares
+% figuras/fig_calibracao.png      - efeito do limiar de clorose
+% tabelas: sessoes (dia, n, severidade media) e AUDPC por foliolo
+
+% =====================================================================
+
+\subsection{Discussão}
+
+A principal fonte de erro do método está na clorose, cujo F1 ficou entre
+0,53 e 0,55 em todas as configurações testadas. Parte dessa dificuldade
+vem da própria natureza do sintoma: o amarelecimento se espalha de forma
+gradual, sem uma borda definida entre o tecido verde e o clorótico.
+Durante a anotação manual, essa transição também foi difícil de
+delimitar, e os polígonos foram traçados apenas nas regiões de
+amarelecimento evidente. Assim, áreas de amarelado leve, que o método
+classifica como clorose pelo matiz, ficam marcadas como saudáveis na
+anotação. Isso reduz o F1 da clorose e explica parte da superestimação
+da severidade observada na Figura~\ref{fig:dispersao}. Ou seja, parte do
+erro reflete a incerteza da própria referência, e não apenas uma falha
+do método. Esse resultado reforça a necessidade de mais anotadores, que
+permitiriam medir a concordância entre avaliadores e estimar o limite de
+precisão alcançável para essa classe. 
+
+\section{Conclusão}
+
+Este trabalho apresentou um método para estimar a severidade da
+ferrugem asiática da soja a partir de imagens RGB, combinando
+superpixels SLIC com regras sobre o matiz e a luminosidade no espaço
+CIELab, sem treinamento de redes neurais. Com limiares calibrados contra
+anotação manual, o método acompanhou a severidade anotada ($r = 0{,}87$
+nas 22 imagens anotadas) e detectou bem a necrose. O ponto fraco é a
+clorose, principalmente em folhas com amarelado difuso, em que o método
+tende a superestimar a área afetada.
+
+A comparação entre segmentações mostrou que o algoritmo de superpixel e
+o espaço de cor têm impacto pequeno na precisão. O superpixel simplifica
+o mapa de classificação, mas não melhora o F1, e o CIELab teve vantagem
+pequena, porém consistente, sobre o HSV. O Watershed compacto obteve
+desempenho equivalente ao SLIC em muito menos tempo, sendo uma
+alternativa viável. Assim, o limite do método está na separação entre
+tecido saudável e clorótico, e não na etapa de segmentação. A análise
+temporal, por sua vez, confirmou o aumento da severidade ao longo dos
+dias e revelou inconsistências na nomenclatura do conjunto público, que
+só puderam ser corrigidas com as datas reais das fotos.
+
+O trabalho tem limitações. As anotações foram feitas por um único
+anotador, com critério conservador, e apenas 22 imagens foram anotadas,
+das quais 8 compõem o teste. Folíolos fotografados juntos, como 016 e
+017, ficaram em conjuntos diferentes, o que cria uma dependência leve
+entre treino e teste. Além disso, os limiares são globais e foram
+definidos em um único experimento, com iluminação controlada.
+
+Como trabalhos futuros, propõe-se aplicar balanceamento de cores antes
+da classificação \cite{khan2022}, incluir atributos de textura e um
+classificador aprendido, ampliar a anotação com mais avaliadores e
+testar o método nas imagens de campo do mesmo repositório.
+
+% =====================================================================
+\section*{Agradecimentos}
+
+Os autores agradecem a da Silva et al. \cite{dasilva2022} por disponibilizarem publicamente as imagens utilizadas neste trabalho e ao professor orientador pelo acompanhamento e pelas sugestões ao longo do desenvolvimento do artigo.
+
+{\small
+\bibliographystyle{unsrt}
+\bibliography{refs}
+}
+
+\end{document}
