@@ -58,7 +58,9 @@ def extrair(args):
     """Processa uma folha anotada e guarda, por superpixel: cores derivadas e contagem de pixels anotados."""
     base, pasta_img, pasta_mask, saida, cfg = args
     f = os.path.join(saida, f"feat_{base}.npz")
-    if os.path.isfile(f) and not cfg["refazer"]:
+    f_mask = os.path.join(pasta_mask, base + ".png")
+    # o cache guarda a contagem dos pixels anotados: se a mascara mudou depois dele, refaz
+    if os.path.isfile(f) and not cfg["refazer"] and os.path.getmtime(f) > os.path.getmtime(f_mask):
         return base
     img = cv2.imread(achar_imagem(pasta_img, base))
     bgr = P.redimensionar(img, cfg["lado_max"])
@@ -119,7 +121,7 @@ def main():
     ap.add_argument("--teste", default="", help="folhas anotadas reservadas so para o teste final, ex.: 003_2,006_3")
     ap.add_argument("--criterio", choices=["f1", "mae"], default="f1")
     ap.add_argument("--hue_clorose", default="86:108:2")
-    ap.add_argument("--hue_necrose", default="70,75,80,85")
+    ap.add_argument("--hue_necrose", default="60,65,70,75,80,85")
     ap.add_argument("--l_necrose", default="45,55,65")
     ap.add_argument("--t_local", default="8,12,16,99", help="99 = desliga o contraste local")
     ap.add_argument("--segmentos", type=int, default=4000)

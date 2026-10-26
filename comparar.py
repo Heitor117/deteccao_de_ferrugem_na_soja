@@ -76,7 +76,9 @@ def segmentar(metodo, rgb, mask, cfg):
 def extrair(args):
     base, metodo, pasta_img, pasta_mask, saida, cfg = args
     f = os.path.join(saida, f"feat_{metodo}_{base}.npz")
-    if os.path.isfile(f) and not cfg["refazer"]:
+    f_mask = os.path.join(pasta_mask, base + ".png")
+    # o cache guarda a contagem dos pixels anotados: se a mascara mudou depois dele, refaz
+    if os.path.isfile(f) and not cfg["refazer"] and os.path.getmtime(f) > os.path.getmtime(f_mask):
         return base, metodo
     bgr = P.redimensionar(cv2.imread(achar_imagem(pasta_img, base)), cfg["lado_max"])
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
